@@ -1,0 +1,78 @@
+﻿/*
+BY DMF313.IR !!!! ^_^
+
+Hardware SPI:
+MISO -> 12
+MOSI -> 11
+SCK -> 13
+
+CE -> 8
+CSN -> 7
+*/
+#include <SPI.h>
+#include <DmfNRF.h>
+#include <nRF24L01.h>
+//#include <SoftSPI.h>
+
+NRF DMF313; // ساخت یه شیء از کتابخونه
+
+byte Number = 0;
+char Data[5]; // payloadSize=5
+
+void setup()
+{
+  Serial.begin(9600);
+
+  DMF313.init(8, 7); // cePin=8, csnPin=7
+  DMF313.setSenderAddress((char *)"Majid", 5); // AddressSender = Majid, AddressWidth=5
+  DMF313.setReceiverAddress(0, (char *)"Majid", 5); //PipeNumber=0, AddressReceiver=Mahde, AddressWidth=5
+  DMF313.setReceiverAddress(1, (char *)"Mahde", 5); //PipeNumber=0, AddressReceiver=Mahde, AddressWidth=5
+  DMF313.Pipe(0, 1, 5, 1); //PipeNumber=0, EnablePipe=1, payloadSize=5, enableACK=1
+  DMF313.Pipe(1, 1, 5, 1); //PipeNumber=1, EnablePipe=1, payloadSize=5, enableACK=1
+  DMF313.config(100, Crc8Bit, _1Mbps, 5, 10); // channel=100, Crc8Bit, _1Mbps, DelayReTransmin=5, CountReTransmin=10
+
+  Serial.println("Beginning ...\n\n");
+
+  //Serial.print("getDynamicPayload(0)");   Serial.println( DMF313.getDynamicPayload(0) );
+  //Serial.print("getDynamicPayload(1)");   Serial.println( DMF313.getDynamicPayload(1) );
+  
+}
+
+
+void loop()
+{
+  // ارسال دیتا
+  while (Serial.available() > 0)
+  {
+    Data[Number] = Serial.read();
+    ++Number;
+
+    if (Number == 5) // sizeof(unsigned long)=4, PayloadSize=4
+    {
+      DMF313.send(Data, 3, 0);
+      while (DMF313.isSending()) {}
+      Serial.println("Finished sending");
+      delay(10);
+
+      Serial.print("CountLostPackets=");
+      Serial.println(DMF313.CountLostPackets());
+      if (DMF313.CountLostPackets() >= 15)
+        DMF313.ResetCountLostPackets(0);
+
+      //Serial.print("CountRetransmittedPackets=");
+      //Serial.println(DMF313.CountRetransmittedPackets());
+
+      Serial.print("------------------------------\n\n");
+
+      Number = 0;
+    }
+  }
+
+
+  // دریافت دیتا
+    while (DMF313.RXFifo(NULL) != 0)
+    {
+      DMF313.getData(Data);
+      Serial.println(Data);
+    }
+}

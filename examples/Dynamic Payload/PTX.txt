@@ -1,0 +1,90 @@
+﻿/*
+BY DMF313.IR !!!!! ^_^
+
+Hardware SPI:
+MISO -> 12
+MOSI -> 11
+SCK -> 13
+
+CE -> 8
+CSN -> 7
+*/
+#include <SPI.h>
+#include <DmfNRF.h>
+#include <nRF24L01.h>
+//#include <SoftSPI.h>
+
+NRF DMF313; // ساخت یه شیء از کتابخونه
+
+char Data[33]; // Max Size Payload is 32 byte
+
+void setup()
+{
+  Serial.begin(9600);
+
+  DMF313.init(8, 7); // cePin=8, csnPin=7
+  DMF313.setSenderAddress((char *)"Majid", 5); // AddressSender = Mahde, AddressWidth=5
+  DMF313.setReceiverAddress(0, (char *)"Majid", 5); //PipeNumber=0, AddressReceiver=Majid, AddressWidth=5
+  DMF313.setReceiverAddress(1, (char *)"Mahde", 5); //PipeNumber=0, AddressReceiver=Majid, AddressWidth=5
+  DMF313.Pipe(0, 1, 0, 1); //PipeNumber=0, EnablePipe=1, payloadSize=0, enableACK=1
+  DMF313.Pipe(1, 1, 0, 1); //PipeNumber=1, EnablePipe=1, payloadSize=0, enableACK=1
+  DMF313.config(10, Crc8Bit, _1Mbps, 10, 15); // channel=10, Crc8Bit, _1Mbps, DelayReTransmin=10, CountReTransmin=15
+
+  Serial.println("Beginning ...\n\n");
+
+  /*
+  // Waite 2 Minute
+  uint8_t ChannelList[128];
+  DMF313.findBestChannel(ChannelList,0,127,500);
+  for (int i = 0; i <= 127; i++)
+  {
+    Serial.print("ChannelList["); Serial.print(i); Serial.print("] = ");
+    Serial.println(ChannelList[i]);
+  }
+  */
+}
+
+
+void loop()
+{
+  // ارسال دیتا
+  while (Serial.available() > 0)
+  {
+    // خالی کردن آرایه
+    for (int i = 0; i <= 31; i++)
+      Data[i] = NULL;
+
+    // پر کردن آرایه
+    for (int i = 0; Serial.available() > 0 ; i++) {
+      if (i == 32) break; // این کار رو میکنیم تا به اندازه طول آرایه دیتا دریافت بشه
+
+      Data[i] = Serial.read();
+      delay(5);
+    }
+
+    DMF313.send(Data, 3, 0); // PALevel=3, NoACK=0=false
+    while (DMF313.isSending()) {}
+
+    Serial.print("CountLostPackets=");
+    Serial.println(DMF313.CountLostPackets());
+    if (DMF313.CountLostPackets() >= 15)
+      DMF313.ResetCountLostPackets(0);
+
+    Serial.print("CountRetransmitPackets=");
+    Serial.println(DMF313.CountRetransmitPackets());
+
+    Serial.print("------------------------------\n\n");
+  }
+
+
+  // دریافت دیتا
+  while (DMF313.RXFifo(NULL) != 0)
+  {
+    // خالی کردن آرایه
+    for (int i = 0; i <= 31; i++)
+      Data[i] = NULL;
+
+    DMF313.getData(Data);
+    Serial.println(Data);
+  }
+}
